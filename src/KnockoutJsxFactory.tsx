@@ -2057,6 +2057,7 @@ declare global {
         interface IntrinsicElements {
             //input: HTMLInputElementValueBindingsAttributes,               
             "ko": any;
+            "comment": any;
             [name: string]: HTMLAttributes<HTMLElement> | SVGAttributes<SVGElement>;
         }
     }
@@ -2150,6 +2151,11 @@ export function KnockoutJsxFactory(tagName: string | (new (...args: any[]) => JS
          
         }
 
+    } else if (tagName === "comment" && attributes && "data-bind" in attributes) {
+               let a = [document.createComment("ko "+ attributes["data-bind"])];
+                a.push(...children);
+                a.push(document.createComment("/ko"));
+               return a;
     }
 
     let element = document.createElement(tagName);
