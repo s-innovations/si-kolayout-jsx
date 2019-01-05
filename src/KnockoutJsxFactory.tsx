@@ -1,6 +1,6 @@
 ﻿import { JSXLayout } from "./JSXLayout";
 import * as ko from "knockout";
-import { KoLayout } from "si-kolayout";
+import { KoLayout, isDefined } from "si-kolayout";
 
 export interface AttributeCollection {
     key?: string;
@@ -51,10 +51,10 @@ export interface ValueKnockoutBindingHandlers<T> {
 }
 
 export enum ValueUpdate {
-    input,
-    keyup,
-    keypress,
-    afterkeydown
+    input = "input",
+    keyup = "keyup",
+    keypress = "keypress",
+    afterkeydown ="afterkeydown"
 }
 
 export enum ValueAllowUnset {
@@ -75,25 +75,25 @@ export interface HTMLInputElementTextInput {
 
  
 
-export function valueBinding<T, T1 extends number | string>(value: keyof T, valueUpdate?: ValueUpdate | keyof T, valueAllowUnset?: ValueAllowUnset | keyof T) {
+export function valueBinding<T, T1 extends number | string | boolean>(value: keyof T, valueUpdate?: ValueUpdate | keyof T, valueAllowUnset?: ValueAllowUnset | keyof T) {
 
     let binding = { value: value as any } as HTMLInputElementValueBindings<T1>;
                        
 
     if (valueUpdate) {
-       
-        let valueUpdateEscaped = ValueUpdate[valueUpdate as ValueUpdate];
+
+        let valueUpdateEscaped = ValueUpdate[valueUpdate as ValueUpdate] as string;
         if (typeof valueUpdateEscaped !== "undefined")
             valueUpdateEscaped = `\"${valueUpdateEscaped}\"`;
 
-        binding.valueUpdate = valueUpdateEscaped || valueUpdate as keyof T;
+        binding.valueUpdate = valueUpdateEscaped || valueUpdate  as string;
     }
     if (valueAllowUnset) {
         let valueAllowUnsetEscaped = ValueAllowUnset[valueAllowUnset as ValueAllowUnset];
         if (typeof valueAllowUnsetEscaped !== "undefined")
             valueAllowUnsetEscaped = `\"${valueAllowUnsetEscaped}\"`;
 
-        binding.valueAllowUnset = valueAllowUnsetEscaped || valueAllowUnset as keyof T;
+        binding.valueAllowUnset = valueAllowUnsetEscaped || valueAllowUnset as string;
     }
     return binding as BindingNumber | BindingString;
 }
@@ -2073,6 +2073,7 @@ declare global {
 
 interface TestNode extends Node {
     childLayouts?: { [key: string]: JSXLayout<any> }
+    attributes?: any;
 }
 function isJsxLayout(x: any): x is JSXLayout<{ key: string }>{
     return x instanceof JSXLayout;
@@ -2101,9 +2102,18 @@ function appendChild(parent: TestNode, child: undefined | string | TestNode | Te
 
     } else if (isJsxLayout(child)) {
 
-        parent.appendChild(document.createComment("koLayout: childLayouts." + child.attributes.key));
-        parent.childLayouts = parent.childLayouts || {}
-        parent.childLayouts[child.attributes.key] = child;
+        if (parent.attributes && parent.attributes["data-bind"] && parent.attributes["data-bind"].value.indexOf("foreach") !== -1 && "templateNodes" in child) {
+
+            parent.appendChild(child.templateNodes as HTMLElement);
+
+
+
+        } else {
+
+            parent.appendChild(document.createComment("koLayout: childLayouts." + child.attributes.key));
+            parent.childLayouts = parent.childLayouts || {};
+            parent.childLayouts[child.attributes.key] = child;
+        }
     } else if (child instanceof KoLayout) {
         
         parent.appendChild(document.createComment("koLayout: childLayouts." + child.attributes.key));
@@ -2120,22 +2130,24 @@ export function KnockoutJsxFactory(tagName: string | (new (...args: any[]) => JS
    
     if (typeof (tagName) === "function") {
         attributes = attributes || {};
-      //  
-        let b = new tagName(attributes);
+        
+        let b = new tagName(attributes, children);
         b.attributes.key = b.attributes.key || ("a" + (i++).toString());
         return b;
-    //    return document.createComment("test");
+    
     }
+    if (tagName === "comment") {
+        children.unshift(document.createComment(` ko ${attributes["data-bind"]} `));
+        children.push(document.createComment("/ko"));
+        return children;
+        
 
+    }
     if (tagName === "ko") {
         if ("layout" in attributes) {
             return document.createComment("koLayout :" + attributes["layout"]);
         } else if ("if" in attributes) {
-         //   let a = [document.createComment("ko if :" + attributes["if"]) ];
-          //  a.push(...children);
-          //  a.push(document.createComment("/ko"));
-          //  return a;
-
+        
             let div = document.createElement("DIV");
             div.setAttribute("data-bind", "fadedIf:" + attributes["if"]);
             if ("class" in attributes) {
@@ -2182,7 +2194,9 @@ export function KnockoutJsxFactory(tagName: string | (new (...args: any[]) => JS
         }
 
         for (let key of Object.keys(attributes)) {
-            element.setAttribute(key, attributes[key]);
+            if (isDefined(attributes[key])) {
+                element.setAttribute(key, attributes[key]);
+            }
         }
     }
 

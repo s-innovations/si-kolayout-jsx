@@ -10,7 +10,7 @@ export class JSXLayout<T extends { key?: string }> extends KoLayout {
         return this.templateNodes.childLayouts;
     }
 
-    constructor(public attributes: T, private templateNodes: JSX.Element) {
+    constructor(public attributes: T, public templateNodes: JSX.Element) {
         super({
             nodes: [templateNodes as any as HTMLElement],
             afterRender: (...args: any[]) => this.afterRender(...args)
